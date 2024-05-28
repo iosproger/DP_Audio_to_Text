@@ -1,0 +1,211 @@
+# for colab 
+
+pip install pydub
+
+!unzip /content/training_data.zip -d cmp
+
+import os
+import numpy as np
+import librosa
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.optimizers import Adam
+from skimage.transform import resize
+from scipy.io import wavfile
+from IPython.display import Audio
+
+import tensorflow as tf
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from IPython import display
+from pydub import AudioSegment
+import io
+
+# Define your folder structure
+data_dir = 'training_data'
+classes = ['non', 'olma', 'salom', 'test']
+
+# Load and preprocess audio data
+def load_and_preprocess_data(data_dir, classes, target_shape=(128, 128)):
+    data = []
+    labels = []
+
+    for i, class_name in enumerate(classes):
+        class_dir = os.path.join(data_dir, class_name)
+        for filename in os.listdir(class_dir):
+            if filename.endswith('.mp3'):
+                file_path = os.path.join(class_dir, filename)
+                audio_data, sample_rate = librosa.load(file_path, sr=None)
+                # Perform preprocessing (e.g., convert to Mel spectrogram and resize)
+                mel_spectrogram = librosa.feature.melspectrogram(y=audio_data, sr=sample_rate)
+                mel_spectrogram = resize(np.expand_dims(mel_spectrogram, axis=-1), target_shape)
+                data.append(mel_spectrogram)
+                labels.append(i)
+
+    return np.array(data), np.array(labels)
+
+# Split data into training and testing sets
+data, labels = load_and_preprocess_data(data_dir, classes)
+labels = to_categorical(labels, num_classes=len(classes))  # Convert labels to one-hot encoding
+# X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.1, random_state=42)
+X_train , y_train= data , labels
+
+import random
+
+# Combine X_train and y_train into a list of tuples
+combined_data = list(zip(X_train, y_train))
+
+# Shuffle the combined data
+random.shuffle(combined_data)
+
+# Unzip the shuffled data back into X_train and y_train
+X_train_shuffled, y_train_shuffled = zip(*combined_data)
+
+# Convert back to numpy arrays
+X_train_shuffled = np.array(X_train_shuffled)
+y_train_shuffled = np.array(y_train_shuffled)
+
+import matplotlib.pyplot as plt
+
+# Define the number of rows and columns for the subplot grid
+rows = 3
+cols = 3
+n = rows * cols
+
+plt.figure(figsize=(16, 10))
+
+# Plot the audio signals for each class
+for i in range(min(n, len(classes))):
+    plt.subplot(rows, cols, i+1)  # Start from the first subplot
+    audio_signal = X_train[i, :, :, 0]
+    plt.plot(audio_signal)
+    plt.title(classes[i])  # Use the class names for titles
+    plt.yticks(np.arange(-1.2, 1.2, 0.2))
+    plt.ylim([-1.1, 1.1])
+
+# Adjust layout and show the plot
+plt.tight_layout()
+plt.show()
+
+# Define the number of rows and columns for the subplot grid
+rows = 3
+cols = 3
+n = rows * cols
+
+plt.figure(figsize=(16, 10))
+
+# Plot the spectrograms for each class
+for i in range(min(n, len(classes))):
+    plt.subplot(rows, cols, i+1)  # Start from the first subplot
+    spectrogram = X_train[i, :, :, 0]
+    plt.imshow(spectrogram, aspect='auto', origin='lower')
+    plt.title(classes[i])  # Use the class names for titles
+
+# Adjust layout and show the plot
+plt.tight_layout()
+plt.show()
+
+# Create a neural network model
+input_shape = X_train[0].shape
+input_layer = Input(shape=input_shape)
+x = Conv2D(32, (3, 3), activation='relu')(input_layer)
+x = MaxPooling2D((2, 2))(x)
+x = Conv2D(64, (3, 3), activation='relu')(x)
+x = MaxPooling2D((2, 2))(x)
+x = Flatten()(x)
+x = Dense(64, activation='relu')(x)
+output_layer = Dense(len(classes), activation='softmax')(x)
+model = Model(input_layer, output_layer)
+
+model.compile(optimizer=Adam(0.0001), loss="mse", metrics=['mean_absolute_error'])
+# model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# model.fit(X_train_shuffled, y_train_shuffled, epochs=10)
+model.fit(X_train,y_train, epochs=10)
+
+# Evaluate the model on the testing data
+loss, mean_absolute_error = model.evaluate(X_test, y_test)
+
+# Print the test loss and mean absolute error
+print("Test Loss:", loss)
+print("Mean Absolute Error:", mean_absolute_error)
+
+# Predict class probabilities for testing data
+predictions = model.predict(X_test)
+
+# Convert predicted probabilities to class labels
+predicted_labels = np.argmax(predictions, axis=1)
+true_labels = np.argmax(y_test, axis=1)
+print("Predicted Labels:", predicted_labels)
+print("True Labels:",true_labels)
+
+# Define label names
+label_names = ['non', 'olma', 'salom', 'test']  # Modify this list with your actual class names
+
+# Define predicted labels and true labels
+y_pred = predicted_labels
+y_true = true_labels
+
+print("Shape of y_true:", y_true.shape)
+print("Shape of y_pred:", y_pred.shape)
+
+
+# Compute confusion matrix
+confusion_mtx = tf.math.confusion_matrix(y_true, y_pred)
+
+# Plot confusion matrix
+plt.figure(figsize=(10, 8))
+sns.heatmap(confusion_mtx,
+            xticklabels=label_names,
+            yticklabels=label_names,
+            annot=True, fmt='g')
+plt.xlabel('Prediction')
+plt.ylabel('Label')
+plt.title('Confusion Matrix')
+plt.show()
+
+# /tetetetetete
+!unzip /content/test_data.zip -d cmp1
+
+# x1_test = load_and_preprocess_data_for_test('/content/test_data')
+x1_test, l_1 = load_and_preprocess_data('/content/test_data', classes)
+
+# Predict class probabilities for testing data
+predictions = model.predict(x1_test)
+
+# Convert predicted probabilities to class labels
+predicted_labels = np.argmax(predictions, axis=1)
+
+print("Predicted Labels:", predicted_labels)
+print("True Labels:",l_1)
+
+# Print the predicted class names
+names = []
+truename = []
+for label in predicted_labels:
+    if label == 0:
+        names.append("non")
+    elif label == 1:
+        names.append("olma")
+    elif label == 2:
+        names.append("salom")
+    elif label == 3:
+        names.append("test")
+
+for label in l_1:
+    if label == 0:
+        truename.append("non")
+    elif label == 1:
+        truename.append("olma")
+    elif label == 2:
+        truename.append("salom")
+    elif label == 3:
+        truename.append("test")
+
+print(names)
+print(truename)
